@@ -1,220 +1,293 @@
+###################################################################################
+# GUI interface to do some basic D&D 3.5 dice interactions
+# Written by Rich Adler - adlerrich - 9/4/23
+# MIGHT INCLUDE:
+    # Saving throw generator for spells
+    # Spell compendium
+    # Character Creation
+    # D&D Class and Class Feature compendium
+    # Modify Attack Window to accept multiple bonuses
+    # Graphics, background images, dark mode toggle, and other fluff
+###################################################################################
+
 import tkinter as tk
+from tkinter import ttk
 import random as rn
-import sys
-import os
 
-window = tk.Tk()
+# Set up parent window to host frames
+root = tk.Tk()
+main_window = tk.Frame(root)
+root.geometry("800x500")
+root.config(bg="black")
 
-def roll_checks(rolls, bonus):
-  roll_list = [rn.randint(1,20) for i in range(0, rolls)]
-  return_list = []
+# Use them to make an attack roll, sorting first by checking to see if it's a critcal roll(note a critcal in D&D is 
+#either a naturally generated 20, which means the best possible outcome will occur in a situation, and a naturally
+# generated 1, which means the opposite), then checking if the roll + hit bonus is greater than the armor class given
+def roll_attacks(segment_type, intvar_list):
+    dice_list = [int(item.get()) for item in intvar_list]
+    rolls = dice_list[0]
+    bonus = dice_list[1]
+    ac = dice_list[2]
+    damage = dice_list[3]
+    crit = int(dice_list[4])
+    damage_mod = dice_list[5]
 
-  for i in roll_list:
-    if i == 1:
-      return_list.append('Critical Fail!')
-    elif i == 20:
-      return_list.append('Critical Succes!')
-    else:
-      return_list.append(i + bonus)
-
-  textArea = tk.Text(master=window,height=2,width=30)
-  textArea.grid(column=1,row=4)
-  output = return_list
-  textArea.insert(tk.END, output)
-
-def roll_attacks(rolls, bonus, ac, dmg, crit, mod):
-    
-    rolls_int = int(rolls)
-    bonus_int = int(bonus)
-    ac_int = int(ac)
-    dmg_int = int(dmg)
-    crit_int = int(crit)
-    mod_int = int(mod)
-
-    roll_list = [rn.randint(1,20) for i in range(0, rolls_int)]
-
-    attack_list = []
-
+    roll_list = [rn.randint(1,20) for i in range(0, rolls)]
+    output = []
     for i in roll_list:
-      if i == 1:
-        attack_list.append('Critical Fail!')
-      elif i >= crit:
-        attack_list.append('Critical Success!')
-      elif (i + bonus_int) > ac_int:
-        attack_list.append('Hit')
-      else:
-        attack_list.append('Miss')
+        if i == 1:
+            output.append("Critical Fail!  ")
+        elif i >= crit:
+            output.append("Crit! " + str((rn.randint(1, damage) + damage_mod) * 2) + " damage ")
+        elif (i + bonus) > ac:
+            temp_damage = rn.randint(1, damage) + damage_mod
+            if temp_damage < 10:
+                output.append("Hit " + str(temp_damage) + " damage    ")
+            elif temp_damage > 9:
+                output.append("Hit " + str(temp_damage) + " damage   ")
+        else:
+            output.append("Miss            ")
+
+    text_area = tk.Text(master=segment_type, width=16, height=len(output), bg="black", fg="white")
+    text_area.grid(row=20, column=0)
+    for i in range(len(output)):
+        index = str(i) + ".0"
+        text_area.insert(index, output[i])
+
+# Check for critcal rolls, and add bonus to roll otherwise
+def roll_checks(segment_type, intvar_list):
+    dice_list = [int(item.get()) for item in intvar_list]
+
+    roll_list = [rn.randint(1,20) for i in range(dice_list[0])]
+    output = []
+    for roll in roll_list:
+        if roll == 1:
+            to_append = ("Nat 1 ")
+        elif roll == 20:
+            to_append = ("Nat 20")
+        elif dice_list[1] + roll > 9:
+            to_append = (str(roll + dice_list[1]) + "    ")
+        else:
+            to_append = (str(roll + dice_list[1]) + "     ")
+        output.append("You rolled: " + to_append)
+
+    text_area = tk.Text(master=segment_type, width=18, height=len(output), bg="black", fg="white")
+    text_area.grid(row=14, column=1)
+    for i in range(len(output)):
+        index = str(i) + ".0"
+        text_area.insert(index, output[i])
+
+# Filter through a giant elif statement to see turnig result. D&D 3.5 turning is... suboptimal
+def roll_turn(segment_type, intvar_list):
+    dice_list = [int(item.get()) for item in intvar_list]
+    levelCleric = dice_list[0]
+    cha = dice_list[1]
+    output = []
+
+    D20 = rn.randint(1,20) + cha + 2
+    D6a = rn.randint(1,6)
+    D6b = rn.randint(1,6)
+    turn_count = D6a + D6b + cha
+    turn_total = None
+
+    if turn_count <= 0 :
+        turn_total = levelCleric - 4
+    elif 3 >= turn_count > 0 :
+        turn_total = levelCleric - 3
+    elif 6 >= turn_count > 3 :
+        turn_total = levelCleric - 2
+    elif 9 >= turn_count > 6 :
+        turn_total = levelCleric - 1
+    elif 12 >= turn_count > 9 :
+        turn_total = levelCleric
+    elif 15 >= turn_count > 12 :
+        turn_total = levelCleric + 1
+    elif 18 >= turn_count > 15 :
+        turn_total = levelCleric + 2
+    elif 21 >= turn_count > 18 :
+        turn_total = levelCleric + 3
+    elif turn_count > 21 :
+        turn_total = levelCleric + 4
+
+    if turn_total < 10:
+        to_append_turn = str(turn_total) + "  "
+    elif turn_total > 9:
+        to_append_turn = str(turn_total) + " "
   
-    damage_list = []
-  
-    for i in attack_list:
-      if i == 'Critical Success!':
-        damage_list.append(2 * (mod_int + (rn.randint(3, dmg_int))))
-      elif i == 'Hit':
-        damage_list.append(mod_int + (rn.randint(1, dmg_int)))
-      else:
-        damage_list.append(0)
+    output = [" total hit die  ", ("You can turn " + to_append_turn),  "of undead, with ", "a maximum undead", ("hit die of " + str(D20))]
 
-      return_list = zip(attack_list, damage_list)
-      output = list(return_list)
-      print('working maybe')
-      textArea = tk.Text(master=window,height=3,width=30)
-      textArea.grid(column=1,row=1)
-      textArea.insert(tk.END, output)
+    text_area = tk.Text(master=segment_type, width=16, height=7, bg="black", fg="white")
+    text_area.grid(row=7, column=2)
+    for i in range(0, len(output)):
+        index = str(i) + ".0"
+        text_area.insert(index, output[i])
+      
+# TODO do something about this comment
+# Defining the main superclass that does most of the heavy lifting, initialize class with a list of the labels to go above the entries, 
+# the additional segment(the window wrappers are hard coded in as to keep track of the data and because frames interact with the root window 
+# and are responosible for the overlays under the checkboxes, see below for checkbox wrapper set ups, the additional segment (wrapper) will 
+# sit on an underlying frame which itself sits on top of the root window), and the value of the column to place the checkbox and drop down menu.  
+# Two lists are created based on the length of the label list, one for entries and one for tk.Intvar() objects. The above functions retrieve 
+#and work with the intvar lists, the data being obtained from the entry widgets. This superclass also contains the method create_layout(), 
+#requiring no arguements, instead setting up the layout based on the init information. Using the grid method, it starts at row 1, as the 
+#checkboxes are hosted on row 0, and the column value provided, sets up a label, adds 1 to the current row, then places an entry. 
+#It continues this until it runs out of labels, at which point it will attach a button under the final entry widget with an appropriate command. 
+#Note that the class launches with the button_command set to None, and it's manually the line after initializing. This is because the command
+#uses self data, and cannot initialize with it's own data passed into a function.
+class Segment_Layout:
+    def __init__(self, label_list, additional_segment, column_val):
+        self.label_list = label_list
+        self.button_command = None
+        self.intvar_list = [tk.IntVar(additional_segment) for i in range(len(label_list))]
+        self.entry_list = [0 for i in range(len(label_list))]
+        self.column_val = column_val
+        self.additional_segment = additional_segment
 
-  
-#def get_atk_inputs():
-  #ouput = roll_attacks(int(attacks_entry.get()), int(bonus_entry_atk.get()), int(ac_entry.get()), int(dmg_entry.get()), int(crit_entry.get()), int(mod_entry.get()))
-  #textArea = tk.Text(master=window,height=3,width=30)
-  #textArea.grid(column=1,row=1)
-  #textArea.insert(tk.END, output)
+    def create_layout(self):
+        current_row = 1
+        num_widgets = len(self.label_list)
+        for i in range(num_widgets):
+            temp = self.label_list[i]
+            self.label_list[i] = tk.Label(self.additional_segment, text=temp, fg="white", bg="black")
+            self.label_list[i].grid(row=current_row, column=self.column_val)
+            current_row += 1
+            self.entry_list[i] = tk.Entry(self.additional_segment, textvariable=self.intvar_list[i], fg="white", bg="slate gray")
+            self.entry_list[i].grid(row=current_row, column=self.column_val)
+            current_row+=1
 
-def turn_check(levelCleric, cha):
-  D20 = rn.randint(1,20) + cha + 2
-  D6a = rn.randint(1,6)
-  D6b = rn.randint(1,6)
-  turnCount = D6a + D6b + cha
-  turnTotal = None
+        layout_button = tk.Button(self.additional_segment, text="Roll Dice", command=self.button_command, fg="white", bg="dark slate gray")
+        layout_button.grid(row=current_row, column=self.column_val)
 
-  if turnCount <= 0 :
-        turnTotal = levelCleric - 4
-  elif 3 >= turnCount > 0 :
-        turnTotal = levelCleric - 3
-  elif 6 >= turnCount > 3 :
-        turnTotal = levelCleric - 2
-  elif 9 >= turnCount > 6 :
-        turnTotal = levelCleric - 1
-  elif 12 >= turnCount > 9 :
-        turnTotal = levelCleric
-  elif 15 >= turnCount > 12 :
-        turnTotal = levelCleric + 1
-  elif 18 >= turnCount > 15 :
-        turnTotal = levelCleric + 2
-  elif 21 >= turnCount > 18 :
-        turnTotal = levelCleric + 3
-  elif turnCount > 21 :
-        turnTotal = levelCleric + 4
-  
-  return '''You can turn {turnTotal} total hit die of undead, with a 
-maximum undead hit die of {D20}.
-D6 Roll total: {turnCount}
-D20 Roll total: {D20}'''
+# Define specific classes that do different math all based on Segment_Layout
+class Attack_Layout(Segment_Layout):
+    def __init__(Segment_Layout, label_list, additional_segment, column_val):
+        super().__init__(label_list, additional_segment, column_val)
 
-def spell_check():
-  pass
+class Check_Layout(Segment_Layout):   
+    def __init__(Segment_Layout, label_list, additional_segment, column_val):
+        super().__init__(label_list, additional_segment, column_val)
 
-def char_create(hitdie):
-  def gen_list():
-    rand_list = [rn.randint(3,6) for i in range(1, 4)]
-    return rand_list
+class Turn_Layout(Segment_Layout):
+    def __init__(Segment_Layout, label_list, additional_segment, column_val):
+        super().__init__(label_list, additional_segment, column_val)
 
-  stat_list = [sum(gen_list()) for i in range(1, 7)]
-  hitpoints = rn.randint(3, hitdie)
+# Series of functions to wrap frames over root window when checked 
+def on_click_atk():
+    if atk_button_var.get() == 1:
+        additional_section_atk.grid(row=0, column=0)
+        atk_wrapper.config(height = 0)
+    elif atk_button_var.get() == 0:
+        additional_section_atk.grid_forget()
+        atk_wrapper.config(height = 1)
 
-  return stat_list, hitpoints
+def on_click_check():
+    if check_button_var.get() == 1:
+        additional_section_check.grid(row=0, column=1)
+        check_wrapper.config(height = 0)
+    elif check_button_var.get() == 0:
+        additional_section_check.grid_forget()
+        check_wrapper.config(height = 1)
 
-class check_window:
-  def __init__(self):
-    window = tk.Tk()
-    window.geometry('600x350')
-    window.title(' Skill Check ')
-    checks_label = tk.Label(text = 'Number of Checks: ')
-    checks_label.grid(column=0, row=0)
-    checks_intvar = tk.IntVar()
-    checks_entry = tk.Entry(window)
-    checks_entry.grid(column=1, row=0)
-    bonus_label_chk = tk.Label(text = 'Skill Bonus: ')
-    bonus_label_chk.grid(column=0, row=1)
+def on_click_turn():
+    if turn_button_var.get() == 1:
+        additional_section_turn.grid(row=0, column=2)
+        turn_wrapper.config(height = 0)
+    elif turn_button_var.get() == 0:
+        additional_section_turn.grid_forget()
+        turn_wrapper.config(height = 1)
 
-    bonus_entry_chk = tk.Entry(window)
-    bonus_entry_chk.grid(column=1, row=1)
-    enter_btn_chk = tk.Button(window, text='Roll Checks', command=roll_checks(int(checks_entry.get()), int(bonus_entry_chk.get())))
-    enter_btn_chk.grid(column=1, row=2)
-    window.mainloop()
+atk_button_var = tk.IntVar()
+atk_button= tk.Checkbutton(text="Roll Attacks", variable=atk_button_var, command=on_click_atk, fg="white", bg="black")
+atk_button.grid(row=0, column=0)
 
-def check_launcher():
-  window.destroy()
-  launcher = check_window()
-  return launcher
+check_button_var = tk.IntVar()
+check_button = tk.Checkbutton(text="Roll Checks", variable=check_button_var, command=on_click_check, fg="white", bg="black")
+check_button.grid(row=0, column=1)
 
-class attack_window:
-  def __init__(self):
-    window.geometry('600x350')
-    window.title(' Attack Rolls ')
-    attacks_label = tk.Label(window, text = 'Number of Attacks: ')
-    attacks_label.grid(column=0, row=0)
-    attacks_entry = tk.Entry(window)
-    attacks_entry.grid(column=0, row=1)
-    ac_label = tk.Label(window, text='Enemy AC: ')
-    ac_label.grid(column=0, row=2)
-    ac_entry = tk.Entry(window)
-    ac_entry.grid(column=0, row=3)
-    bonus_label_atk = tk.Label(window, text = 'Hit Bonus: ')
-    bonus_label_atk.grid(column=0, row=4)
-    bonus_entry_atk = tk.Entry(window)
-    bonus_entry_atk.grid(column=0, row=5)
-    dmg_label = tk.Label(window, text='Damage Die: ')
-    dmg_label.grid(column=0, row=6)
-    dmg_entry = tk.Entry(window)
-    dmg_entry.grid(column=0, row=7)
-    crit_label = tk.Label(window, text='Lower Crit Range: ')
-    crit_label.grid(column=0, row=8)
-    crit_entry = tk.Entry(window)
-    crit_entry.grid(column=0, row=9)
-    mod_label = tk.Label(window, text='Damage Mod: ')
-    mod_label.grid(column=0, row=10)
-    mod_entry = tk.Entry(window)
-    mod_entry.grid(column=0, row=11)
-    enter_btn_atk = tk.Button(window, text='Roll Attacks', command=roll_attacks((attacks_entry.get()), (bonus_entry_atk.get()), (ac_entry.get()), (dmg_entry.get()), (crit_entry.get()), (mod_entry.get())))    
-    enter_btn_atk.grid(column=1, row=0)
-    window.mainloop()
+turn_button_var = tk.IntVar()
+turn_button= tk.Checkbutton(text="Turn Undead", variable=turn_button_var, command=on_click_turn, fg="white", bg="black")
+turn_button.grid(row=0, column=2)
 
-def attack_launcher():
-  window.destroy()
-  launcher = attack_window()
-  return launcher
+# Set up each frame, and frame wrapper, attach it to the appropriate class, define it's button commands, and create a layout based on init data
+atk_wrapper = tk.Frame(root)
+atk_wrapper.grid(row=1, column=0)
+additional_section_atk = tk.Frame(atk_wrapper, bg="black")
+attack_segment = Attack_Layout(["Number of Attacks", "Hit Bonus", "Enemy AC", "Damage Die", "Lower Crit Range", "Damage Bonus"], additional_section_atk, 0)
+attack_segment.button_command = lambda: roll_attacks(additional_section_atk, attack_segment.intvar_list)
+attack_segment.create_layout()
 
-class turn_window:
-  pass
+check_wrapper = tk.Frame(root)
+check_wrapper.grid(row=1, column=1)
+additional_section_check = tk.Frame(check_wrapper, bg="black")
+check_segment = Check_Layout(["Number of Checks", "Skill Bonus"], additional_section_check, 1)
+check_segment.button_command = lambda: roll_checks(additional_section_check, check_segment.intvar_list)
+check_segment.create_layout()
 
-def turn_launcher():
-  window.destroy()
-  launcher = turn_window()
-  return launcher
+turn_wrapper = tk.Frame(root)
+turn_wrapper.grid(row=1, column=2)
+additional_section_turn = tk.Frame(turn_wrapper, bg="black")
+turn_segment = Turn_Layout(["Cleric Level", "Charisma Modifier"], additional_section_turn, 2)
+turn_segment.button_command = lambda: roll_turn(additional_section_turn, turn_segment.intvar_list)
+turn_segment.create_layout()
 
-class spell_window:
-  pass
+def hide_segments():
+    additional_section_atk.grid_forget()
+    atk_wrapper.config(height = 1)
+    atk_button_var.set(0)
+    additional_section_check.grid_forget()
+    check_wrapper.config(height = 1)
+    check_button_var.set(0)
+    additional_section_turn.grid_forget()
+    turn_wrapper.config(height = 1)
+    turn_button_var.set(0)
 
-def spell_launcher():
-  window.destroy()
-  launcher = spell_window()
-  return launcher
+def exit_program():
+    root.destory()
+    atk_wrapper.destroy()
+    check_wrapper.destroy()
+    turn_wrapper.destory()
 
-class char_create_window:
-  pass
+def reset_windows(intvar_list_1, intvar_list_2, intvar_list_3):
+    for value in intvar_list_1:        
+        value.set(0)
 
-def create_launcher():
-  window.destroy()
-  launcher = char_create_window()
-  return launcher
+    for value in intvar_list_2:
+        value.set(0)
 
-class main_window:
-  def __init__(self):
-    window.geometry('600x350')
-    window.title("Welcome! Push a button below to start pushing buttons!")
-    check_btn = tk.Button(window, text='Skill Check', command = check_launcher)
-    check_btn.grid(column=0,row=0)
-    attack_btn = tk.Button(window, text = "Attack", command = attack_launcher)
-    attack_btn.grid(column=1,row=0)
-    turn_btn = tk.Button(window, text='Undead Turning', command = turn_launcher)
-    turn_btn.grid(column=2, row=0)
-    spell_btn = tk.Button(window, text='Spells', command = spell_launcher)
-    spell_btn.grid(column=0, row=2)
-    char_create_btn = tk.Button(window, text= 'New Character', command = create_launcher)
-    char_create_btn.grid(column=1, row=2)
-    restart_btn = tk.Button(window, text='Refresh')
-    restart_btn.grid(column=2, row=2)
-    window.mainloop()
+    for value in intvar_list_3:
+        value.set(0)
 
-test = attack_window()
-test
+    #additional_segment_atk.grid_forget(row=20, column=0)
+    #additional_segment_check.grid_forget(row=14, column=1)
+    #additional_segment_turn.grid_forget(row=7, column=2)
+
+menubar = tk.Menu(root)
+
+filemenu = tk.Menu(menubar, tearoff=0)
+filemenu.add_command(label="Hide Menus", command=hide_segments)
+filemenu.add_command(label="Refresh Menus", command=reset_windows)
+filemenu.add_separator()
+filemenu.add_command(label="Exit", command=exit_program)
+menubar.add_cascade(label="File", menu=filemenu)
+
+# Launch window with a little info about the program and I
+def about():
+    about_window = tk.Tk()
+    about_window.geometry("425x350")
+    about_window.config(bg="black")
+    about_text = '''I created this window because the D&D 3.5 system  to rebuke undead is very tiresome, and preferred  to do it automatically instead. While I was at it,I decided to go ahead and add some extra          fuctionality to it, cause I got tired of rolling 9swim checks across 2 characters and pets. I wantedto learn more about python, and I wanted to make  something a little more user friendly outside the terminal, instead using tkinter to build a gui.   Hopefully I'll add more to it over time, as it's  been a fun hobby project. For now, it includes    attacks, although there's no way to set different attack bonuses, checks, and of course, it rebukes undead about 5 minutes faster than I can roll the dice and do the math.'''
+    window_text = tk.Text(master=about_window, height = 16, width=50, bg="black", fg="white")
+    window_text.grid(row=0, column=0)
+    window_text.insert(tk.END, about_text)
+    destroy_button = tk.Button(about_window, text="Close", command=about_window.destroy, bg="dark slate gray", fg="white")
+    destroy_button.grid(row=1, column=0)
+    about_window.mainloop()
+
+# TDOO WRITE Launch window with information about how to operate the program
+
+helpmenu = tk.Menu(menubar, tearoff=0)
+helpmenu.add_command(label="Help Index", command=None)
+helpmenu.add_command(label="About...", command=about)
+menubar.add_cascade(label="Help", menu=helpmenu)
+root.config(menu=menubar)
+root.mainloop()
